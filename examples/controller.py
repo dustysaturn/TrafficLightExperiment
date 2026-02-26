@@ -18,6 +18,9 @@ class Controller():
     def move_tcp(self, pose: list[float], vel: float, acc: float):
         self.robot.movej_tcp(pose, vel, acc)
         
+    def shake_vial(self, time, direction, force):
+        pass
+        
     def vial_gripped(self) -> bool:
         if self.gripper.is_closed():
             return False

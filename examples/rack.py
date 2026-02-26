@@ -53,11 +53,10 @@ class Rack():
         self.check_indices(row, col)
         
         pos = self.top_left.copy()
-        
         # TODO: figure out how this should work
 
-        pos[0] += (col * self.col_gap)
-        pos[1] += (row * self.row_gap)
+        pos[2] += (col * self.col_gap)
+        #pos[1] += (row * self.row_gap)
 
         return pos
         
