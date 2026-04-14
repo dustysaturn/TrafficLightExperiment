@@ -51,7 +51,7 @@ def average_row_gap(poses: dict, rows: int, cols: int):
         for j in range(rows-1):
             sum += abs(poses[(j, i)][0] - poses[(j+1, i)][0])
 
-    average = sum / (cols * rows - 1)
+    average = sum / (cols * (rows - 1))
     
     return average
     
@@ -63,7 +63,7 @@ def average_column_gap(poses: dict, rows: int, cols: int):
             print(f"comparing {(i, j)} with {(i, j+1)}")
             sum += abs(poses[(i, j)][1] - poses[(i, j+1)][1])
 
-    average = sum / (rows * (cols-1))
+    average = sum / (rows * (cols - 1))
     
     return average
     

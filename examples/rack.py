@@ -54,8 +54,8 @@ class Rack():
         
         pos = self.top_left.copy()
         
-        pos[0] += (row * self.row_gap)
-        pos[1] += (col * self.col_gap)
+        pos[0] -= (row * self.row_gap)
+        pos[1] -= (col * self.col_gap)
 
         return pos
         
