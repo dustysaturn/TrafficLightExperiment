@@ -3,6 +3,7 @@ from utils.UR_Functions import URfunctions as URControl
 from controller import Controller
 from rack import Rack, VialState
 from stirrer import Stirrer
+from detector import ColourDetector, SubtractionMethod
 import time
 
 STARTING_TOP_LEFT = [0.247303237, -0.50343651, 0.061092968, -0.000494386386, 3.10905968, 0.0322229148]
@@ -22,6 +23,8 @@ class BlueBottle():
         
         self.controller = Controller(self.robot, self.gripper)
         
+        self.detector = ColourDetector("./examples/colour_change.mp4", SubtractionMethod.KNN)
+
     def setup_starting_rack(self, rows: int, cols: int, row_gap: float, col_gap: float, top_left_tcp: list[float]) -> None:
         self.starting_rack = Rack(rows, cols, row_gap, col_gap, top_left_tcp)
     
@@ -33,6 +36,7 @@ class BlueBottle():
         self.stirrer.connect()
     
     def run(self):
+        self.detector.start()
         self.controller.go_home()
         
         while search_position := self.starting_rack.get_next_search_position(): 
@@ -65,16 +69,55 @@ class BlueBottle():
                 # Move down to just above stirrer
                 self.controller.move_tcp(self.stirrer.get_stirring_position(), 0.1, 0.1)
                 
-                # TODO stirrer driver code
+                self.detector.vialPresent = True
                 self.stirrer.set_speed(rpm=1)
                 self.stirrer.start()
                 
-                # TODO: Add CV stuff
-                # While colour change is still happening, keep stirring
+                # ACTIVE : yellow -> red -> green
+
+                print("Starting stirring.")
+                                
+                red_frames = 0
+                required_frames = 20
                 
+                while red_frames < required_frames:
+                    if self.detector.colourName == "Red":
+                        red_frames += 1
+                    else:
+                        red_frames = 0
+                    
+                    time.sleep(0.1)
+                    
+                print("Reaction has reached red. Speeding up stirrer stirrer...")
+                
+                self.stirrer.set_speed(rpm = 1000)
+                green_frames = 0
+                
+                while green_frames < required_frames:
+                    if self.detector.colourName == "Green":
+                        green_frames += 1
+                    else:
+                        green_frames = 0
+                    
+                    time.sleep(0.1)
+
+                print("Reaction has reached green. Stopping stirrer...")
+
                 self.stirrer.stop()
                 
-                
+                # PASSIVE: green -> red -> yellow
+                print("Waiting until solution is yellow...")
+                yellow_frames = 0
+
+                while yellow_frames < required_frames:
+                    if self.detector.colourName == "Yellow":
+                        yellow_frames += 1
+                    else:
+                        yellow_frames = 0
+                        pass
+                    
+                    time.sleep(0.1)
+
                 if not (empty_spot := self.finishing_rack.get_empty_spot()):
                     raise Exception("No empty spot available. Stopping.")
                 else:
@@ -102,7 +145,6 @@ class BlueBottle():
                     
                     # move back up
                     self.controller.move_tcp(above_position, 0.1, 0.1)
-        
     
 if __name__ == "__main__":
     experiment = BlueBottle()
