@@ -1,0 +1,15 @@
+Vial present
+False
+False
+255
+144
+255
+0
+
+Vial not present
+False
+False
+255
+144
+255
+0

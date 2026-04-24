@@ -9,8 +9,8 @@ def main():
     #tcp_socket.connect((HOST, PORT))
     gripper=RobotiqGripper()
     gripper.connect(HOST, 63352)
-    #gripper.activate()
-    gripper.move(255, 255, 255)
+    gripper._reset()
+    # gripper.move(255, 255, 255)
 
 
 if __name__ == '__main__':

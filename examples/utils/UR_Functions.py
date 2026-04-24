@@ -3,7 +3,7 @@
 import socket
 import numpy as np
 import os
-import utils.util
+import utils.util as util
 from time import sleep
 import struct
 import sys
@@ -238,7 +238,7 @@ class URfunctions:
         rpy[0] += delta_theta_x  # Adjust roll (rotation around x-axis)
         rpy[1] += delta_theta_y  # Adjust pich (rotation around y-axis)
         rpy[2] += delta_theta_z  # Adjust yaw (rotation around Z-axis)
-        target_rv = utils.rpy2rv(rpy)
+        target_rv = util.rpy2rv(rpy)
         target_tcp = np.array([
             current_tcp[0] + delta_x,
             current_tcp[1] + delta_y,

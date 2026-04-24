@@ -2,7 +2,7 @@ class Stirrer:
     def __init__(self, stirring_position):
         self.speed = 0
         self.running = False
-        self.stirring_position = stirring_position
+        self.stirring_position = list(stirring_position)
         
     def connect(self):
         pass
@@ -14,7 +14,7 @@ class Stirrer:
         if vertical_gap <= 0:
             raise ValueError("Vertical gap must be positive")
             
-        above_stirring = self.stirring_position
+        above_stirring = self.stirring_position.copy()
         above_stirring[2] += vertical_gap
         
         return above_stirring

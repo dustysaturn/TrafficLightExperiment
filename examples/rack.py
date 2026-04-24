@@ -6,18 +6,21 @@ class VialState(Enum):
     UNKNOWN = 2
 
 class Rack():
-    def __init__(self, rows: int, cols: int, row_gap: float, col_gap: float, top_left_picking_tcp: list[float]) -> None:
+    def __init__(self, rows: int, cols: int, row_gap: float, col_gap: float, top_left_picking_tcp: list[float], bottom_right_picking_tcp: list[float], empty: bool) -> None:
         self.rows = rows
         self.cols = cols
         self.row_gap = row_gap
         self.col_gap = col_gap
         self.top_left = top_left_picking_tcp
+        self.bottom_right = bottom_right_picking_tcp
+
+        vial_state = VialState.EMPTY if empty else VialState.UNKNOWN
         
         self.state = [
-            [VialState.UNKNOWN for _ in range(self.cols)] 
+            [vial_state for _ in range(self.cols)] 
             for _ in range(self.rows)
         ]
-        
+            
     def __len__(self) -> int:
         return self.rows * self.cols
     
@@ -61,8 +64,8 @@ class Rack():
         
     def get_above_tcp(self, row: int, col: int, vertical_gap: float) -> list[float]:
         self.check_indices(row, col)
-        
-        pos = self.get_picking_tcp(row, col)
+            
+        pos = self.get_picking_tcp(row, col).copy()
         
         pos[2] += vertical_gap
         
