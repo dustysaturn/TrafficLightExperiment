@@ -6,13 +6,21 @@ from enum import Enum
 import numpy as np
 import matplotlib.pyplot as plt
 
+# bus 003 device 005 id 046d: 08e5 logitech inc hd pro webcam c920
+
 class SubtractionMethod(Enum):
     KNN = 1
     MOG2 = 2
 
 class ColourDetector():
     def __init__(self, camera, subtraction_method, record=True):
+        self.lock = threading.Lock()
         self.cam = cv2.VideoCapture(camera)
+        print(f"Width: {int(self.cam.get(cv2.CAP_PROP_FRAME_WIDTH))}")
+        print(f"Height: {int(self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT))}")    
+        self.top_left = (360, 368)
+        self.bottom_right = (720, 1104)
+        
         self.record = record
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
@@ -27,7 +35,6 @@ class ColourDetector():
         self.mask = None
         self.frame = None
         self.colourName = None
-        self.colourRGB = None
         self.vialPresent = False
         self.history = {"Yellow": [], "Red": [], "Green": [], "Seconds": []}
         self.start_time = time.time()
@@ -56,6 +63,8 @@ class ColourDetector():
         while(self.running):
             ret, frame = self.cam.read()
             
+            # frame = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
+            
             if not ret:
                 self.running = False
                 
@@ -76,6 +85,9 @@ class ColourDetector():
                 ]
                 
                 self.history["Seconds"].append(time.time() - self.start_time)
+                self.masks = { }
+                self.residual_masks = {}
+                kernel = np.ones((5, 5), "uint8")
                             
                 for (name, lower, upper, colour) in colours:
                     if name == "Red":
@@ -84,6 +96,9 @@ class ColourDetector():
                         colour_mask = cv2.bitwise_or(red_1, red_2)
                     else:
                         colour_mask = cv2.inRange(hsv, lower, upper)
+                
+                    self.masks[name] = cv2.dilate(colour_mask, kernel)
+                    self.residual_masks[name] = cv2.bitwise_and(frame, frame, mask = self.masks[name])
                         
                     combined = cv2.bitwise_and(colour_mask, self.mask)
                     count = np.count_nonzero(combined)
@@ -97,9 +112,24 @@ class ColourDetector():
                         self.frame = frame
             else:
                 time.sleep(0.5)
+    
+    def drawContour(self, colourName, frame):
+        if self.masks is None or colourName not in self.masks:
+            return frame
+            
+        contours, _ = cv2.findContours(self.masks[colourName], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for contour in contours:            
+            if (cv2.contourArea(contour) > 300):
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                cv2.putText(frame, f"{colourName}", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
+        
+        return frame
                     
 if __name__ == "__main__":
-    detect = ColourDetector("./examples/colour_change.mp4", SubtractionMethod.KNN)
+    colours = ("Yellow", "Red", "Green")
+    detect = ColourDetector("./colour_change.mp4", SubtractionMethod.MOG2)
     detect.vialPresent = True
     detect.start()
 
@@ -117,27 +147,30 @@ if __name__ == "__main__":
     while detect.running:
         if detect.frame is not None:
             display = detect.frame.copy()
-            cv2.putText(
-                display, 
-                f"Colour:{detect.colourName}", 
-                (10, 50), 
-                cv2.FONT_HERSHEY_PLAIN, 
-                2, 
-                detect.colourRGB, 
-                3)
+            cv2.putText(display, f"Colour:{detect.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, detect.colourRGB, 3)            
+            
+            detect.drawContour(detect.colourName, display)
+            cv2.rectangle(display, detect.top_left, detect.bottom_right,  (255, 0, 255), 3)
+            
             cv2.imshow("Detection", display)
             
-            s_len = len(detect.history["Seconds"])
-            g_len = len(detect.history["Green"])
-            o_len = len(detect.history["Yellow"])
-            r_len = len(detect.history["Red"])
+            seconds = list(detect.history["Seconds"])
+            yellow = list(detect.history["Yellow"])
+            red = list(detect.history["Red"])
+            green = list(detect.history["Green"])
+            
+            s_len = len(seconds)
+            g_len = len(green)
+            y_len = len(yellow)
+            r_len = len(red)
 
-            if s_len > 0 and s_len == g_len == o_len == r_len:
+            if s_len > 0 and s_len == g_len == y_len == r_len:
                 view_window = -50
-                x_data = detect.history["Seconds"][view_window:]
-                
-                for name in ["Yellow", "Red", "Green"]:
-                    lines[name].set_data(x_data, detect.history[name][view_window:])
+                x_data = seconds[view_window:]
+                                    
+                lines["Yellow"].set_data(x_data, yellow[view_window:])
+                lines["Red"].set_data(x_data, red[view_window:])
+                lines["Green"].set_data(x_data, green[view_window:])
             
                 ax.relim()
                 ax.autoscale_view()
