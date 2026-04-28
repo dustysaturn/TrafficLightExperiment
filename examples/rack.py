@@ -1,9 +1,5 @@
-from enum import Enum
-
-class VialState(Enum):
-    PRESENT = 0
-    EMPTY = 1
-    UNKNOWN = 2
+from vial import Vial
+from enums import VialState
 
 class Rack():
     def __init__(self, rows: int, cols: int, row_gap: float, col_gap: float, top_left_picking_tcp: list[float], bottom_right_picking_tcp: list[float], empty: bool) -> None:
@@ -14,10 +10,10 @@ class Rack():
         self.top_left = top_left_picking_tcp
         self.bottom_right = bottom_right_picking_tcp
 
-        vial_state = VialState.EMPTY if empty else VialState.UNKNOWN
+        vial_states = VialState.EMPTY if empty else VialState.UNKNOWN        
         
         self.state = [
-            [vial_state for _ in range(self.cols)] 
+            [vial_states for _ in range(self.cols)] 
             for _ in range(self.rows)
         ]
             
@@ -34,7 +30,7 @@ class Rack():
                 
     def check_indices(self, row: int, col: int):
         if not 0 <= row < self.rows:
-            raise IndexError(f"IndexError: Row {row} out of range 0...{self.cols}")
+            raise IndexError(f"IndexError: Row {row} out of range 0...{self.rows}")
         
         if not 0 <= col < self.cols:
             raise IndexError(f"IndexError: Column {col} out of range 0...{self.cols}")
@@ -46,7 +42,7 @@ class Rack():
         self.check_indices(row, col)
 
         self.state[row][col] = vial_state
-            
+                    
     def get_vial_state(self, row: int, col: int) -> VialState:
         self.check_indices(row, col)
         
@@ -55,11 +51,18 @@ class Rack():
     def get_picking_tcp(self, row: int, col: int) -> list[float]:
         self.check_indices(row, col)
         
-        pos = self.top_left.copy()
-        
-        pos[0] -= (row * self.row_gap)
-        pos[1] -= (col * self.col_gap)
-
+        top_left_distance = row + col
+        bottom_right_distance = (abs(row - (self.rows-1))) + (abs(col - (self.cols-1)))
+                
+        if top_left_distance <= bottom_right_distance:
+            pos = self.top_left.copy()
+            pos[0] -= (row * self.row_gap)
+            pos[1] -= (col * self.col_gap)
+        else:
+            pos = self.bottom_right.copy()
+            pos[0] += ((self.rows - 1 - row) * self.row_gap)
+            pos[1] += ((self.cols - 1 - col) * self.col_gap)
+            
         return pos
         
     def get_above_tcp(self, row: int, col: int, vertical_gap: float) -> list[float]:

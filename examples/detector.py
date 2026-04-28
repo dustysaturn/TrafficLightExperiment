@@ -2,39 +2,56 @@ import threading
 import time
 from datetime import datetime
 import cv2
-from enum import Enum
+from enums import SubtractionMethod
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import os
 
 # bus 003 device 005 id 046d: 08e5 logitech inc hd pro webcam c920
-
-class SubtractionMethod(Enum):
-    KNN = 1
-    MOG2 = 2
 
 class ColourDetector():
     def __init__(self, camera, subtraction_method, record=True):
         self.lock = threading.Lock()
         self.cam = cv2.VideoCapture(camera)
-        print(f"Width: {int(self.cam.get(cv2.CAP_PROP_FRAME_WIDTH))}")
-        print(f"Height: {int(self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT))}")    
-        self.top_left = (360, 368)
-        self.bottom_right = (720, 1104)
-        
-        self.record = record
+            
+        if not os.path.exists('videos'):
+            os.makedirs('videos')
+                
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+                
+        self.width = int(self.cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height = int(self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        
+        self.top_left = (int(self.width * (2/5)), int(self.height * (1/3)))
+        self.bottom_right = (int(self.width * (3/5)), int(self.height * (2/3)))
+        
         self.cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*'MJPG'))
         self.record = record
         if self.record:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            fourcc = cv2.VideoWriter.fourcc(*'mp4v')
-            self.out = cv2.VideoWriter(f'experiment_{timestamp}.mp4', fourcc, 20.0, (1920, 1080))
+            
+            if not os.path.exists(f'videos/{timestamp}'):
+                os.makedirs(f'videos/{timestamp}')
+                
+            self.folder = f'./videos/{timestamp}'
+            
+            # Switch to mp4v for linux
+            fourcc = cv2.VideoWriter.fourcc(*'avc1')
+            self.out = cv2.VideoWriter(f'{self.folder}/raw.mp4', fourcc, 20.0, (self.width, self.height))
+            if not self.out.isOpened():
+                print("ERROR: VideoWriter failed to open. Check your codec, file path, and resolution.")
+            else:
+                print("SUCCESS: VideoWriter is ready to record.")
         
         self.method = subtraction_method
         self.mask = None
+        self.masks = {}
         self.frame = None
-        self.colourName = None
+        self.colourName = "None"
+        self.colourRGB = (255, 255, 255)
         self.vialPresent = False
         self.history = {"Yellow": [], "Red": [], "Green": [], "Seconds": []}
         self.start_time = time.time()
@@ -45,7 +62,6 @@ class ColourDetector():
             self.subtractor = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
         else:
             raise ValueError("Invalid subtraction method provided")
-
     
     def start(self):
         self.running = True
@@ -62,19 +78,23 @@ class ColourDetector():
     def loop(self):
         while(self.running):
             ret, frame = self.cam.read()
-            
-            # frame = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
-            
+                                    
             if not ret:
                 self.running = False
+                continue
+                        
+            with self.lock:
+                self.frame = frame.copy()
                 
             if self.record:
                 self.out.write(frame)
 
             if self.vialPresent:
-                self.mask = self.subtractor.apply(frame)
                 
-                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                cropped = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
+                
+                self.mask = self.subtractor.apply(cropped)
+                hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
                 
                 detected = None
                 
@@ -84,9 +104,7 @@ class ColourDetector():
                     ("Green", np.array([25, 52, 72], dtype=np.uint8), np.array([102, 255, 255], dtype=np.uint8), (0, 255, 0)),
                 ]
                 
-                self.history["Seconds"].append(time.time() - self.start_time)
                 self.masks = { }
-                self.residual_masks = {}
                 kernel = np.ones((5, 5), "uint8")
                             
                 for (name, lower, upper, colour) in colours:
@@ -98,18 +116,20 @@ class ColourDetector():
                         colour_mask = cv2.inRange(hsv, lower, upper)
                 
                     self.masks[name] = cv2.dilate(colour_mask, kernel)
-                    self.residual_masks[name] = cv2.bitwise_and(frame, frame, mask = self.masks[name])
                         
                     combined = cv2.bitwise_and(colour_mask, self.mask)
                     count = np.count_nonzero(combined)
                     
-                    self.history[name].append(count)
+                    with self.lock:
+                        self.history["Seconds"].append(time.time() - self.start_time)
+                        self.history[name].append(count)
                     
                     if count > 10000 and detected is None:
                         detected = name
                         self.colourName = detected
                         self.colourRGB = colour
-                        self.frame = frame
+                        with self.lock:
+                            self.frame = frame.copy()
             else:
                 time.sleep(0.5)
     
@@ -122,14 +142,18 @@ class ColourDetector():
         for contour in contours:            
             if (cv2.contourArea(contour) > 300):
                 x, y, w, h = cv2.boundingRect(contour)
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                cv2.putText(frame, f"{colourName}", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
+                
+                new_x = x + self.top_left[0]
+                new_y = y + self.top_left[1]
+                
+                cv2.rectangle(frame, (new_x, new_y), (new_x + w, new_y + h), (0, 0, 255), 2)
+                cv2.putText(frame, f"{colourName}", (new_x, new_y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
         
         return frame
                     
 if __name__ == "__main__":
     colours = ("Yellow", "Red", "Green")
-    detect = ColourDetector("./colour_change.mp4", SubtractionMethod.MOG2)
+    detect = ColourDetector(0, SubtractionMethod.MOG2)
     detect.vialPresent = True
     detect.start()
 
@@ -143,42 +167,79 @@ if __name__ == "__main__":
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Pixel count")
     ax.legend(loc='upper left')
+    
+    def get_plot_image(figure):
+        figure.canvas.draw()
 
-    while detect.running:
-        if detect.frame is not None:
-            display = detect.frame.copy()
-            cv2.putText(display, f"Colour:{detect.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, detect.colourRGB, 3)            
-            
-            detect.drawContour(detect.colourName, display)
-            cv2.rectangle(display, detect.top_left, detect.bottom_right,  (255, 0, 255), 3)
-            
-            cv2.imshow("Detection", display)
-            
-            seconds = list(detect.history["Seconds"])
-            yellow = list(detect.history["Yellow"])
-            red = list(detect.history["Red"])
-            green = list(detect.history["Green"])
-            
-            s_len = len(seconds)
-            g_len = len(green)
-            y_len = len(yellow)
-            r_len = len(red)
+        image = np.array(figure.canvas.renderer.buffer_rgba(), dtype=np.uint8)
 
-            if s_len > 0 and s_len == g_len == y_len == r_len:
-                view_window = -50
-                x_data = seconds[view_window:]
-                                    
-                lines["Yellow"].set_data(x_data, yellow[view_window:])
-                lines["Red"].set_data(x_data, red[view_window:])
-                lines["Green"].set_data(x_data, green[view_window:])
-            
-                ax.relim()
-                ax.autoscale_view()
-                fig.canvas.draw()
-                fig.canvas.flush_events()
-            
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+        return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)         
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    fourcc = cv2.VideoWriter.fourcc(*'avc1')
+    combined_out = None
+    graph_out = None
+    masked_out = None
+
+    try:
+        while detect.running:
+            if detect.frame is not None:
+                display = detect.frame.copy()
+                cv2.putText(display, f"Colour:{detect.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, detect.colourRGB, 3)            
+                
+                detect.drawContour(detect.colourName, display)
+                cv2.rectangle(display, detect.top_left, detect.bottom_right,  (255, 0, 255), 3)
+                        
+                if masked_out is None:
+                    height, width, _ = display.shape
+                    masked_out = cv2.VideoWriter(f'{detect.folder}/masked.mp4', fourcc, 10.0, (width, height))
+
+                masked_out.write(display)
+                            
+                seconds = list(detect.history["Seconds"])
+                yellow = list(detect.history["Yellow"])
+                red = list(detect.history["Red"])
+                green = list(detect.history["Green"])
+                
+                min_length = min(len(seconds), len(yellow), len(red), len(green))
+
+                if min_length > 0:
+                    view_window = -100
+                    x_data = seconds[:min_length][view_window:]
+                                       
+                    lines["Yellow"].set_data(x_data, yellow[:min_length][view_window:])
+                    lines["Red"].set_data(x_data, red[:min_length][view_window:])
+                    lines["Green"].set_data(x_data, green[:min_length][view_window:])
+                
+                    ax.relim()
+                    ax.autoscale_view()
+                    
+                    plot_frame = get_plot_image(fig)
+                    
+                    width = display.shape[1]
+                    height = int(plot_frame.shape[0] * (width / plot_frame.shape[1]))
+                    resized_plot_frame = cv2.resize(plot_frame, (width, height))    
+                    
+                    combined_display = cv2.vconcat([resized_plot_frame, display])
+                    
+                    if combined_out is None:
+                        height, width, _ = combined_display.shape
+                        combined_out = cv2.VideoWriter(f'{detect.folder}/combined.mp4', fourcc, 10.0, (width, height))
+
+                    if graph_out is None:
+                        height, width, _ = plot_frame.shape
+                        graph_out = cv2.VideoWriter(f'{detect.folder}/graph.mp4', fourcc, 10.0, (width, height))
+
+                    combined_out.write(combined_display)
+                    graph_out.write(plot_frame)
+                    
+                    cv2.imshow("Colour Detection", combined_display)
+                
+            k = cv2.waitKey(1)
+            if k == 27:
                 break
-            
-    cv2.destroyAllWindows()
-    detect.end()
+    finally:
+        if combined_out:
+            combined_out.release()
+        cv2.destroyAllWindows()
+        detect.end()
