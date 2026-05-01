@@ -162,6 +162,9 @@ class ColourDetector():
                             self.frame = frame.copy()
             else:
                 time.sleep(0.5)
+                
+    def getFolder(self) -> str:
+        return self.folder
     
     def drawContour(self, colourName, frame):
         if self.masks is None or colourName not in self.masks:

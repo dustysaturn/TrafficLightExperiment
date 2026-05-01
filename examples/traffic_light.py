@@ -45,28 +45,35 @@ class TrafficLight():
     def setup_volumes(self, volumes):
         self.volumes = volumes
                 
-    # CHANGE2
-    def waitForColour(self, colourName: str) -> float:
-        print(f"Watching for colour change to {colourName}")
+    def waitForColour(self, second_run: bool=False) -> tuple[str, float]:
+        print(f"Watching for colour change")
         start_time = time.time()
-        colour_frames = 0
-        while(colour_frames < REQUIRED_FRAMES):
-            if(time.time() - start_time > VISION_TIMEOUT):
-                self.state = "Colour change not detected."
-                return -1
-            
-            if self.detector.colourName == colourName:
-                colour_frames += 1
+        red_frames = 0
+        green_frames = 0
+        while(time.time() - start_time > VISION_TIMEOUT):
+            current = self.detector.colourName
+                        
+            if current == "Red":
+                red_frames += 1
             else:
-                colour_frames = 0        
-            time.sleep(0.1)
+                red_frames = 0
+                
+            if current == "Green":
+                green_frames += 1
+            else:
+                green_frames = 0
+                
+            duration = time.time() - start_time
+            
+            if not second_run:
+                if red_frames > REQUIRED_FRAMES:
+                    return ("Red", duration)
+            
+            if green_frames > REQUIRED_FRAMES:
+                return ("Green", duration)
         
-        duration = time.time() - start_time    
-        
-        print(f"Solution has reached {colourName} in {duration} seconds")
-        
-        return duration
-    
+        return ("None", VISION_TIMEOUT)
+                                
     def run(self):
         self.vial_results = []
         self.detector.start()
@@ -117,24 +124,23 @@ class TrafficLight():
                 self.stirrer.on()
                 self.stirrer.set_speed(rpm=1500)
                     
-                self.detector.change_state("Monitoring for red colour")
+                self.detector.change_state("Monitoring for red or green colour")
                         
-                timeToRed = self.waitForColour("Red")
+                (colour, time) = self.waitForColour()
                 
-                if timeToRed != -1:
-                    vial.set_yellow_to_red(timeToRed)
-                    self.detector.change_state("Speeding up stirrer")
-                    self.stirrer.set_speed(rpm = 1500)
-
-                    print("Stirrer up to speed")
-                
+                if colour == "Red":
+                    self.detector.change_state("Detected red")
+                    vial.set_yellow_to_red(time)
                     self.detector.change_state("Monitoring for green colour")
+                    (colour, time) = self.waitForColour(second_run = True)
 
-                    timeToGreen = self.waitForColour("Green")
-                    
-                    if timeToGreen != -1:
-                        vial.set_red_to_green(timeToGreen)
-                
+                if colour == "Green":
+                    self.detector.change_state("Detected green")
+                    vial.set_yellow_to_green(time)
+                                        
+                else:
+                    self.detector.change_state("No change detected")
+                                        
                 self.detector.change_state("Stopping stirrer")
                 self.stirrer.off()
                                 
@@ -142,7 +148,7 @@ class TrafficLight():
 
                 if not empty_spot:
                     self.detector.change_state("No empty spot available. Stopping")
-                    raise Exception(self.state)
+                    return
                 else:
                     self.detector.change_state("Placing vial in finishing rack")
                     # move to above final spot
@@ -176,9 +182,9 @@ class TrafficLight():
                     
                     # move back up
                     self.controller.move_tcp(above_position, 0.1, 0.1)
-                    
-        
-                    
+
+        graph_results(self.vial_results, self.detector.getFolder(), VISION_TIMEOUT)
+                 
         self.stirrer.disconnect()
         self.gripper.disconnect()
         self.robot.close_connection()
