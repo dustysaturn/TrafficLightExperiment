@@ -1,5 +1,6 @@
 import argparse
 from traffic_light import TrafficLight
+import time
 
 MIN_NAOH = 0
 MAX_NAOH = 50
@@ -29,7 +30,7 @@ def verify_volumes(vials, cols, rows):
     while(True):
         volumes = input_volumes(vials, cols)
         
-        column_header = f"\n  {"     ".join([str(i) for i in (range(cols))])}"
+        column_header = f"\n  {'     '.join([str(i) for i in (range(cols))])}"
         
         print(column_header)
         

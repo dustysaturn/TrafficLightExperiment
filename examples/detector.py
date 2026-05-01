@@ -1,12 +1,10 @@
 import threading
-import time
 from datetime import datetime
 import cv2
 from enums import SubtractionMethod
 import numpy as np
 import json
-import time
-import matplotlib
+from time import time
 import matplotlib.pyplot as plt
 import os
 
@@ -75,7 +73,7 @@ class ColourDetector():
         self.colourRGB = (255, 255, 255)
         self.vialPresent = False
         self.history = {"Yellow": [], "Red": [], "Green": [], "Seconds": []}
-        self.start_time = time.time()
+        self.start_time = time()
         
         if self.method == SubtractionMethod.KNN:
             self.subtractor = cv2.createBackgroundSubtractorKNN()
@@ -151,7 +149,7 @@ class ColourDetector():
                     count = np.count_nonzero(combined)
                     
                     with self.lock:
-                        self.history["Seconds"].append(time.time() - self.start_time)
+                        self.history["Seconds"].append(time() - self.start_time)
                         self.history[name].append(count)
                     
                     if count > 10000 and detected is None:
@@ -186,12 +184,12 @@ class ColourDetector():
     
     # INTEGRATE
     def change_state(self, state):
-        curr = time.time()
-        time = curr - self.start_time
+        curr = time()
+        elapsed = curr - self.start_time
         print(state)
         
         with open(f"{self.folder}/state.txt", 'a') as file:
-            file.write(f"{state} {str(time)}\n")
+            file.write(f"{state} {str(elapsed)}\n")
             
                 
     def visualise(self):
