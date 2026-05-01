@@ -6,6 +6,7 @@ class Vial():
         self.history = [VialColour.YELLOW]
         self.yellow_to_red = None
         self.red_to_green = None
+        self.yellow_to_green = None
         self.volume = volume
         self.rack = "STARTING"
         self.coords = coords
@@ -20,16 +21,20 @@ class Vial():
             self.history.append(colour)
     
     def set_naoh_volume(self, volume) -> None:
-        self.naoh = volume
+        self.volume = volume
         
     def set_coords(self, coords: tuple[int, int]):
         self.coords = coords
         
-    def set_time_to_red(self, time):
+    def set_yellow_to_red(self, time):
         self.yellow_to_red = time
         
-    def set_time_to_green(self, time):
+    def set_red_to_green(self, time):
         self.red_to_green = time
         
-        self.yellow_to_green = self.yellow_to_red + time
+        if self.yellow_to_red:
+            self.yellow_to_green = self.yellow_to_red + time
+        
+    def set_yellow_to_green(self, time):
+        self.yellow_to_green = time
         

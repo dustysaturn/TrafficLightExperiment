@@ -4,21 +4,19 @@ from datetime import datetime
 import cv2
 from enums import SubtractionMethod
 import numpy as np
+import json
+import time
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
 
 # bus 003 device 005 id 046d: 08e5 logitech inc hd pro webcam c920
 
 class ColourDetector():
-    def __init__(self, camera, subtraction_method, record=True):
+    def __init__(self, vial_cam, main_cam, subtraction_method):
         self.lock = threading.Lock()
-        self.cam = cv2.VideoCapture(camera)
-            
-        if not os.path.exists('videos'):
-            os.makedirs('videos')
-                
+        self.cam = cv2.VideoCapture(vial_cam)
+                            
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
                 
@@ -28,24 +26,47 @@ class ColourDetector():
         self.top_left = (int(self.width * (2/5)), int(self.height * (1/3)))
         self.bottom_right = (int(self.width * (3/5)), int(self.height * (2/3)))
         
-        self.cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*'MJPG'))
-        self.record = record
-        if self.record:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            if not os.path.exists(f'videos/{timestamp}'):
-                os.makedirs(f'videos/{timestamp}')
-                
-            self.folder = f'./videos/{timestamp}'
-            
-            # Switch to mp4v for linux
-            fourcc = cv2.VideoWriter.fourcc(*'avc1')
-            self.out = cv2.VideoWriter(f'{self.folder}/raw.mp4', fourcc, 20.0, (self.width, self.height))
-            if not self.out.isOpened():
-                print("ERROR: VideoWriter failed to open. Check your codec, file path, and resolution.")
-            else:
-                print("SUCCESS: VideoWriter is ready to record.")
+        self.fourcc = cv2.VideoWriter.fourcc(*'mp4v')
         
+        self.cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
+            
+        # INTEGRATE
+        self.main_cam = cv2.VideoCapture(main_cam)
+        self.main_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.main_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        self.main_width = int(self.main_cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.main_height = int(self.main_cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.main_cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
+        
+        self.masked_out = None
+        self.graph_out = None
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if not os.path.exists('videos'):
+            os.makedirs('videos')
+        
+        if not os.path.exists(f'videos/{timestamp}'):
+            os.makedirs(f'videos/{timestamp}')
+            
+        self.folder = f'./videos/{timestamp}'
+        
+        # Switch to mp4v for linux
+        self.out = cv2.VideoWriter(f'{self.folder}/raw.mp4', self.fourcc, 20.0, (self.width, self.height))
+        
+        if not self.out.isOpened():
+            print("ERROR: VIAL_VideoWriter failed to open. Check your codec, file path, and resolution.")
+        else:
+            print("SUCCESS: VIAL_VideoWriter is ready to record.")
+                            
+        # INTEGRATE
+        self.main_out = cv2.VideoWriter(f'{self.folder}/main.mp4', self.fourcc, 20.0, (self.main_width, self.main_height))
+
+        if not self.main_out.isOpened():
+            print("ERROR: MAIN_VideoWriter failed to open. Check your codec, file path, and resolution.")
+        else:
+            print("SUCCESS: MAIN_VideoWriter is ready to record.")
+
         self.method = subtraction_method
         self.mask = None
         self.masks = {}
@@ -67,35 +88,44 @@ class ColourDetector():
         self.running = True
         self.thread = threading.Thread(target=self.loop, daemon=True)
         self.thread.start()
+
+        self.visualise_thread = threading.Thread(target=self.visualise, daemon=True)
+        self.visualise_thread.start()
     
     def end(self):
         self.running = False
         if self.thread.is_alive():
             self.thread.join()
-        self.out.release()
-        self.cam.release()
+            
+        if self.visualise_thread.is_alive():
+            self.visualise_thread.join()
+            
+        for writer in [self.out, self.main_out, self.masked_out, self.graph_out]:
+            if writer is not None:
+                writer.release()
         
     def loop(self):
         while(self.running):
             ret, frame = self.cam.read()
+            main_ret, main_frame = self.main_cam.read()
                                     
-            if not ret:
+            if not (ret and main_ret):
                 self.running = False
                 continue
                         
             with self.lock:
                 self.frame = frame.copy()
+                self.main_frame = main_frame.copy()
                 
-            if self.record:
-                self.out.write(frame)
+            self.out.write(frame)
+            self.main_out.write(main_frame)
 
             if self.vialPresent:
-                
                 cropped = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
                 
                 self.mask = self.subtractor.apply(cropped)
                 hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
-                
+                            
                 detected = None
                 
                 colours = [
@@ -150,96 +180,98 @@ class ColourDetector():
                 cv2.putText(frame, f"{colourName}", (new_x, new_y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
         
         return frame
-                    
-if __name__ == "__main__":
-    colours = ("Yellow", "Red", "Green")
-    detect = ColourDetector(0, SubtractionMethod.MOG2)
-    detect.vialPresent = True
-    detect.start()
-
-    plt.ion()
-    fig, ax = plt.subplots()
-    lines = {
-        "Yellow": ax.plot([], [], color='yellow', label="Yellow")[0],
-        "Red": ax.plot([], [], color='red', label="Red")[0],
-        "Green": ax.plot([], [], color='green', label="Green")[0],
-    }
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Pixel count")
-    ax.legend(loc='upper left')
     
-    def get_plot_image(figure):
-        figure.canvas.draw()
-
-        image = np.array(figure.canvas.renderer.buffer_rgba(), dtype=np.uint8)
-
-        return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)         
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fourcc = cv2.VideoWriter.fourcc(*'avc1')
-    combined_out = None
-    graph_out = None
-    masked_out = None
-
-    try:
-        while detect.running:
-            if detect.frame is not None:
-                display = detect.frame.copy()
-                cv2.putText(display, f"Colour:{detect.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, detect.colourRGB, 3)            
+    # INTEGRATE
+    def change_state(self, state):
+        curr = time.time()
+        time = curr - self.start_time
+        print(state)
+        
+        with open(f"{self.folder}/state.txt", 'a') as file:
+            file.write(f"{state} {str(time)}\n")
+            
                 
-                detect.drawContour(detect.colourName, display)
-                cv2.rectangle(display, detect.top_left, detect.bottom_right,  (255, 0, 255), 3)
-                        
-                if masked_out is None:
-                    height, width, _ = display.shape
-                    masked_out = cv2.VideoWriter(f'{detect.folder}/masked.mp4', fourcc, 10.0, (width, height))
+    def visualise(self):
+        self.vialPresent = True
 
-                masked_out.write(display)
+        plt.ion()
+        fig, ax = plt.subplots()
+        lines = {
+            "Yellow": ax.plot([], [], color='yellow', label="Yellow")[0],
+            "Red": ax.plot([], [], color='red', label="Red")[0],
+            "Green": ax.plot([], [], color='green', label="Green")[0],
+        }
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Pixel count")
+        ax.legend(loc='upper left')
+        
+        def get_plot_image(figure):
+            figure.canvas.draw()
+
+            image = np.array(figure.canvas.renderer.buffer_rgba(), dtype=np.uint8)
+
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)         
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        try:    
+            while self.running:
+                if self.frame is not None:
+                    display = self.frame.copy()
+                    cv2.putText(display, f"Colour:{self.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, self.colourRGB, 3)            
+                    
+                    main_display = self.main_frame.copy()
+                    
+                    cv2.imshow("Colour detection", main_display)
+                    
+                    self.drawContour(self.colourName, display)
+                    cv2.rectangle(display, self.top_left, self.bottom_right,  (255, 0, 255), 3)
                             
-                seconds = list(detect.history["Seconds"])
-                yellow = list(detect.history["Yellow"])
-                red = list(detect.history["Red"])
-                green = list(detect.history["Green"])
-                
-                min_length = min(len(seconds), len(yellow), len(red), len(green))
+                    if self.masked_out is None:
+                        height, width, _ = display.shape
+                        self.masked_out = cv2.VideoWriter(f'{self.folder}/masked.mp4', self.fourcc, 10.0, (width, height))
 
-                if min_length > 0:
-                    view_window = -100
-                    x_data = seconds[:min_length][view_window:]
-                                       
-                    lines["Yellow"].set_data(x_data, yellow[:min_length][view_window:])
-                    lines["Red"].set_data(x_data, red[:min_length][view_window:])
-                    lines["Green"].set_data(x_data, green[:min_length][view_window:])
-                
-                    ax.relim()
-                    ax.autoscale_view()
+                    self.masked_out.write(display)
+                                
+                    seconds = list(self.history["Seconds"])
+                    yellow = list(self.history["Yellow"])
+                    red = list(self.history["Red"])
+                    green = list(self.history["Green"])
                     
-                    plot_frame = get_plot_image(fig)
-                    
-                    width = display.shape[1]
-                    height = int(plot_frame.shape[0] * (width / plot_frame.shape[1]))
-                    resized_plot_frame = cv2.resize(plot_frame, (width, height))    
-                    
-                    combined_display = cv2.vconcat([resized_plot_frame, display])
-                    
-                    if combined_out is None:
-                        height, width, _ = combined_display.shape
-                        combined_out = cv2.VideoWriter(f'{detect.folder}/combined.mp4', fourcc, 10.0, (width, height))
+                    min_length = min(len(seconds), len(yellow), len(red), len(green))
 
-                    if graph_out is None:
-                        height, width, _ = plot_frame.shape
-                        graph_out = cv2.VideoWriter(f'{detect.folder}/graph.mp4', fourcc, 10.0, (width, height))
-
-                    combined_out.write(combined_display)
-                    graph_out.write(plot_frame)
+                    if min_length > 0:
+                        view_window = -100
+                        x_data = seconds[:min_length][view_window:]
+                                        
+                        lines["Yellow"].set_data(x_data, yellow[:min_length][view_window:])
+                        lines["Red"].set_data(x_data, red[:min_length][view_window:])
+                        lines["Green"].set_data(x_data, green[:min_length][view_window:])
                     
-                    cv2.imshow("Colour Detection", combined_display)
+                        ax.relim()
+                        ax.autoscale_view()
+                        
+                        plot_frame = get_plot_image(fig)
+                        
+                        if self.graph_out is None:
+                            height, width, _ = plot_frame.shape
+                            self.graph_out = cv2.VideoWriter(f'{self.folder}/graph.mp4', self.fourcc, 10.0, (width, height))
+
+                        self.graph_out.write(plot_frame)
+                        
+                        cv2.imshow("Colour Detection", plot_frame)
+                        cv2.imshow("Colour Detection", plot_frame)
                 
-            k = cv2.waitKey(1)
-            if k == 27:
-                break
-    finally:
-        if combined_out:
-            combined_out.release()
-        cv2.destroyAllWindows()
-        detect.end()
+                k = cv2.waitKey(1)
+                if k == 27:
+                    break
+            
+                time.sleep(0.1)
+        finally:
+            # INTEGRATE
+            with open(f"{self.folder}/colour-history", 'w') as file:
+                json.dump(self.history, file, indent=4)
+            
+            # if combined_out:
+            #     combined_out.release()
+            cv2.destroyAllWindows()
