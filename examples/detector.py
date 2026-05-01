@@ -4,7 +4,9 @@ import cv2
 from enums import SubtractionMethod
 import numpy as np
 import json
-from time import time
+import time
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 
@@ -73,7 +75,7 @@ class ColourDetector():
         self.colourRGB = (255, 255, 255)
         self.vialPresent = False
         self.history = {"Yellow": [], "Red": [], "Green": [], "Seconds": []}
-        self.start_time = time()
+        self.start_time = time.time()
         
         if self.method == SubtractionMethod.KNN:
             self.subtractor = cv2.createBackgroundSubtractorKNN()
@@ -84,10 +86,10 @@ class ColourDetector():
     
     def start(self):
         self.running = True
-        self.thread = threading.Thread(target=self.loop, daemon=True)
+        self.thread = threading.Thread(target=self.loop)
         self.thread.start()
 
-        self.visualise_thread = threading.Thread(target=self.visualise, daemon=True)
+        self.visualise_thread = threading.Thread(target=self.visualise)
         self.visualise_thread.start()
     
     def end(self):
@@ -97,6 +99,8 @@ class ColourDetector():
             
         if self.visualise_thread.is_alive():
             self.visualise_thread.join()
+
+        cv2.destroyAllWindows()
             
         for writer in [self.out, self.main_out, self.masked_out, self.graph_out]:
             if writer is not None:
@@ -145,11 +149,11 @@ class ColourDetector():
                 
                     self.masks[name] = cv2.dilate(colour_mask, kernel)
                         
-                    combined = cv2.bitwise_and(colour_mask, self.mask)
-                    count = np.count_nonzero(combined)
+                    # combined = cv2.bitwise_and(colour_mask, self.mask)
+                    count = np.count_nonzero(colour_mask)
                     
                     with self.lock:
-                        self.history["Seconds"].append(time() - self.start_time)
+                        self.history["Seconds"].append(time.time() - self.start_time)
                         self.history[name].append(count)
                     
                     if count > 10000 and detected is None:
@@ -159,7 +163,7 @@ class ColourDetector():
                         with self.lock:
                             self.frame = frame.copy()
             else:
-                time.sleep(0.5)
+                time.sleep(0.1)
                 
     def getFolder(self) -> str:
         return self.folder
@@ -184,7 +188,7 @@ class ColourDetector():
     
     # INTEGRATE
     def change_state(self, state):
-        curr = time()
+        curr = time.time()
         elapsed = curr - self.start_time
         print(state)
         
@@ -223,7 +227,7 @@ class ColourDetector():
                     
                     main_display = self.main_frame.copy()
                     
-                    cv2.imshow("Colour detection", main_display)
+                    cv2.imshow("Colour detection 1", main_display)
                     
                     self.drawContour(self.colourName, display)
                     cv2.rectangle(display, self.top_left, self.bottom_right,  (255, 0, 255), 3)
@@ -233,6 +237,7 @@ class ColourDetector():
                         self.masked_out = cv2.VideoWriter(f'{self.folder}/masked.mp4', self.fourcc, 10.0, (width, height))
 
                     self.masked_out.write(display)
+                    cv2.imshow("Colour detection 2", display)
                                 
                     seconds = list(self.history["Seconds"])
                     yellow = list(self.history["Yellow"])
@@ -259,10 +264,7 @@ class ColourDetector():
                             self.graph_out = cv2.VideoWriter(f'{self.folder}/graph.mp4', self.fourcc, 10.0, (width, height))
 
                         self.graph_out.write(plot_frame)
-                        
-                        cv2.imshow("Colour Detection", plot_frame)
-                        cv2.imshow("Colour Detection", plot_frame)
-                
+                                        
                 k = cv2.waitKey(1)
                 if k == 27:
                     break
@@ -272,7 +274,3 @@ class ColourDetector():
             # INTEGRATE
             with open(f"{self.folder}/colour-history", 'w') as file:
                 json.dump(self.history, file, indent=4)
-            
-            # if combined_out:
-            #     combined_out.release()
-            cv2.destroyAllWindows()

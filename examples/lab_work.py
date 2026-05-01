@@ -11,6 +11,12 @@ positions = {
 
 HOST = "192.168.0.2"
 PORT = 30003
+GRIPPER_PORT = 63352
+STIRRER_PORT = 3
+
+REQUIRED_FRAMES = 100
+VISION_TIMEOUT = 30
+
 
 def degreestorad(list):
      for i in range(6):
@@ -32,7 +38,7 @@ def test_upwards_function():
 
     # Activate gripper
     gripper=RobotiqGripper()
-    gripper.connect(HOST, 63352)
+    gripper.connect(HOST, GRIPPER_PORT)
     gripper.activate()
 
     to_home(robot)

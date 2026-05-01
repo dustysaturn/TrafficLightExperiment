@@ -37,9 +37,13 @@ def graph_results(vials: list[Vial], folder, timeout):
     
     plt.xlabel("Volume of NaOH (ml)")
     
-    x_buffer = (max(volumes) - min(volumes)) * 0.1
+    if num_vials == 1:
+        plt.xlim(volumes[0] - 0.5, volumes[0] + 0.5)
+    else:
+        x_buffer = (max(volumes) - min(volumes)) * 0.1
+        plt.xlim(min(volumes) - x_buffer, max(volumes) + x_buffer)
 
-    plt.xlim(min(volumes) - x_buffer, max(volumes) + x_buffer)
+
     plt.title("Effect of NaOH on reaction speed in the Traffic Light Experiment")
 
     plt.axhline(y=timeout, color="grey", linestyle=":", label="Timeout")
@@ -49,7 +53,5 @@ def graph_results(vials: list[Vial], folder, timeout):
         os.makedirs(folder)
     
     path = os.path.join(folder, "results_graph.png")
-    plt.savefig(path, dpi=300, bbox_inches='tight')
-    plt.show()
-    
+    plt.savefig(path, dpi=300, bbox_inches='tight')    
     plt.close()

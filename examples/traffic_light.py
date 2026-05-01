@@ -6,17 +6,20 @@ from stirrer import Stirrer
 from detector import ColourDetector
 from enums import VialState, SubtractionMethod
 from vial import Vial
-## ADD2
 from data_analysis import graph_results
 import time
+import numpy as np
+import cv2
 
 HOST = "192.168.0.2"
 ROBOT_PORT = 30003
 GRIPPER_PORT = 63352
-STIRRER_PORT = 3
+STIRRER_PORT = "/dev/ttyACM0"
+VIAL_CAMERA_PORT = 0
+MAIN_CAMERA_PORT = 2
 
 REQUIRED_FRAMES = 100
-VISION_TIMEOUT = 30
+VISION_TIMEOUT = 60
 
 class TrafficLight():
     def __init__(self) -> None:
@@ -27,8 +30,7 @@ class TrafficLight():
         
         self.controller = Controller(self.robot, self.gripper)
         
-        # Change here
-        self.detector = ColourDetector(0, 1, SubtractionMethod.KNN)
+        self.detector = ColourDetector(VIAL_CAMERA_PORT, MAIN_CAMERA_PORT, SubtractionMethod.KNN)
         
         self.detector.change_state("Idle")
 
@@ -50,7 +52,7 @@ class TrafficLight():
         start_time = time.time()
         red_frames = 0
         green_frames = 0
-        while(time.time() - start_time > VISION_TIMEOUT):
+        while(time.time() - start_time < VISION_TIMEOUT):
             current = self.detector.colourName
                         
             if current == "Red":
@@ -74,7 +76,7 @@ class TrafficLight():
         
         return ("None", VISION_TIMEOUT)
                                 
-    def run(self):
+    def run(self, vials):
         self.vial_results = []
         self.detector.start()
         self.detector.change_state("Going home")
@@ -82,6 +84,9 @@ class TrafficLight():
         self.controller.set_gripper(91)
         
         while search_position := self.starting_rack.get_next_search_position(): 
+            if len(self.vial_results) >= vials:
+                break
+
             row, col = search_position
             
             vial = Vial(self.volumes.get((row, col)), (row, col))
@@ -92,17 +97,17 @@ class TrafficLight():
 
             # move above that position
             above_position = self.starting_rack.get_above_tcp(row, col, 0.1)
-            self.controller.move_tcp(above_position, 0.1, 0.1)
+            self.controller.move_tcp(above_position, 0.5, 0.2)
             
             # move down to that position
             picking_position = self.starting_rack.get_picking_tcp(row, col)
-            self.controller.move_tcp(picking_position, 0.1, 0.1)
+            self.controller.move_tcp(picking_position, 0.2, 0.2)
             
             # close gripper
             self.controller.fully_close_gripper()
             time.sleep(1)
             
-            self.controller.move_tcp(above_position, 0.1, 0.1)
+            self.controller.move_tcp(above_position, 0.5, 0.2)
             self.starting_rack.set_vial_state(row, col, VialState.EMPTY)
 
             if not self.controller.vial_gripped():
@@ -113,12 +118,13 @@ class TrafficLight():
                 # Move to above stirrer
                 self.detector.change_state("Vial found. Moving to stirrer")
                 above_stirrer = self.stirrer.get_above_stirring_position(0.05)
-                self.controller.move_tcp(above_stirrer, 0.1, 0.1)
+                self.controller.move_tcp(above_stirrer, 0.5, 0.2)
                 
                 # Move down to just above stirrer
-                self.controller.move_tcp(self.stirrer.get_stirring_position(), 0.1, 0.1)
+                self.controller.move_tcp(self.stirrer.get_stirring_position(), 0.5, 0.2)
                 
                 self.detector.vialPresent = True
+                time.sleep(2)
                 
                 self.detector.change_state("Starting stirring")
                 self.stirrer.on()
@@ -126,17 +132,17 @@ class TrafficLight():
                     
                 self.detector.change_state("Monitoring for red or green colour")
                         
-                (colour, time) = self.waitForColour()
+                (colour, duration) = self.waitForColour()
                 
                 if colour == "Red":
                     self.detector.change_state("Detected red")
-                    vial.set_yellow_to_red(time)
+                    vial.set_yellow_to_red(duration)
                     self.detector.change_state("Monitoring for green colour")
-                    (colour, time) = self.waitForColour(second_run = True)
+                    (colour, duration) = self.waitForColour(second_run = True)
 
                 if colour == "Green":
                     self.detector.change_state("Detected green")
-                    vial.set_yellow_to_green(time)
+                    vial.set_yellow_to_green(duration)
                                         
                 else:
                     self.detector.change_state("No change detected")
@@ -153,14 +159,14 @@ class TrafficLight():
                     self.detector.change_state("Placing vial in finishing rack")
                     # move to above final spot
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.1)
-                    self.controller.move_tcp(above_position, 0.1, 0.1)
+                    self.controller.move_tcp(above_position, 0.5, 0.2)
                     
                     # intermediate movements
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.07)
-                    self.controller.move_tcp(above_position, 0.1, 0.1)
+                    self.controller.move_tcp(above_position, 0.5, 0.2)
 
                     intermediate_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.04)
-                    self.controller.move_tcp(intermediate_position, 0.1, 0.1)
+                    self.controller.move_tcp(intermediate_position, 0.5, 0.2)
 
                     intermediate_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.01)
                     self.controller.move_tcp(intermediate_position, 0.1, 0.1)
@@ -181,10 +187,14 @@ class TrafficLight():
                     self.vial_results.append(vial)
                     
                     # move back up
-                    self.controller.move_tcp(above_position, 0.1, 0.1)
+                    self.controller.move_tcp(above_position, 0.5, 0.2)
+
+        self.detector.running = False
+        time.sleep(0.2)
 
         graph_results(self.vial_results, self.detector.getFolder(), VISION_TIMEOUT)
-                 
+
+        self.detector.end()         
         self.stirrer.disconnect()
         self.gripper.disconnect()
         self.robot.close_connection()

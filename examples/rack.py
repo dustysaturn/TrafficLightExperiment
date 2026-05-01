@@ -24,7 +24,7 @@ class Rack():
         return f'Rack(rows = {self.rows}, row_gap = {self.row_gap}, cols = {self.cols}, col_gap = {self.col_gap})'
     
     def __iter__(self):
-        for i in range(self.rows):
+        for i in range(self.rows)   :
             for j in range(self.cols):
                 yield (i, j, self.state[i][j])
                 

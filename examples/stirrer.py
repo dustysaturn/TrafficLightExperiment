@@ -23,8 +23,8 @@ class Stirrer:
         return above_stirring
     
     def _send(self, message):
-        self.ser.write(message)
-        print("Sending {message}")
+        self.ser.write(message.encode())
+        print(f"Sending {message}")
    
     def connect(self, port):
         self.ser = Serial(port, 9600, timeout=1)
@@ -53,7 +53,7 @@ class Stirrer:
         self._send(f"OUT_SP_4 {rpm}\r\n")
         
         self.speed = rpm
-        print("Setting stirrer speed set to {rpm} RPM")
+        print(f"Setting stirrer speed set to {rpm} RPM")
         
     def get_speed(self) -> int:
         command = f"IN_PV_4\r\n"

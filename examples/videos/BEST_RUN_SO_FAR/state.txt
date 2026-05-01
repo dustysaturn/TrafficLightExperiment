@@ -1,0 +1,18 @@
+Idle 3.8623809814453125e-05
+Going home 0.0012340545654296875
+Searching for vial in next position 4.47986364364624
+Vial found. Moving to stirrer 17.215608596801758
+Starting stirring 26.236985683441162
+Monitoring for red or green colour 26.239471673965454
+Detected green 72.84061479568481
+Stopping stirrer 72.8409628868103
+Placing vial in finishing rack 72.84132218360901
+Searching for vial in next position 93.35729169845581
+Vial not found 107.49783515930176
+Searching for vial in next position 108.4997181892395
+Vial found. Moving to stirrer 118.92982125282288
+Starting stirring 127.95067286491394
+Monitoring for red or green colour 127.95394206047058
+No change detected 187.95402026176453
+Stopping stirrer 187.95447492599487
+Placing vial in finishing rack 187.95477318763733
