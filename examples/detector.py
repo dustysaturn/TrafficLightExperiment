@@ -31,12 +31,12 @@ class ColourDetector():
         self.cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
             
         # INTEGRATE
-        self.main_cam = cv2.VideoCapture(main_cam)
-        self.main_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        self.main_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.main_width = int(self.main_cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.main_height = int(self.main_cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.main_cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
+        # self.main_cam = cv2.VideoCapture(main_cam)
+        # self.main_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        # self.main_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        # self.main_width = int(self.main_cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        # self.main_height = int(self.main_cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # self.main_cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
         
         self.masked_out = None
         self.graph_out = None
@@ -60,12 +60,12 @@ class ColourDetector():
             print("SUCCESS: VIAL_VideoWriter is ready to record.")
                             
         # INTEGRATE
-        self.main_out = cv2.VideoWriter(f'{self.folder}/main.mp4', self.fourcc, 20.0, (self.main_width, self.main_height))
+        # self.main_out = cv2.VideoWriter(f'{self.folder}/main.mp4', self.fourcc, 20.0, (self.main_width, self.main_height))
 
-        if not self.main_out.isOpened():
-            print("ERROR: MAIN_VideoWriter failed to open. Check your codec, file path, and resolution.")
-        else:
-            print("SUCCESS: MAIN_VideoWriter is ready to record.")
+        # if not self.main_out.isOpened():
+        #     print("ERROR: MAIN_VideoWriter failed to open. Check your codec, file path, and resolution.")
+        # else:
+        #     print("SUCCESS: MAIN_VideoWriter is ready to record.")
 
         self.method = subtraction_method
         self.mask = None
@@ -102,25 +102,27 @@ class ColourDetector():
 
         cv2.destroyAllWindows()
             
-        for writer in [self.out, self.main_out, self.masked_out, self.graph_out]:
+        # for writer in [self.out, self.main_out, self.masked_out, self.graph_out]:
+        for writer in [self.out, self.masked_out, self.graph_out]:
             if writer is not None:
                 writer.release()
         
     def loop(self):
         while(self.running):
             ret, frame = self.cam.read()
-            main_ret, main_frame = self.main_cam.read()
+            # main_ret, main_frame = self.main_cam.read()
                                     
-            if not (ret and main_ret):
+            # if not (ret and main_ret):
+            if not (ret):
                 self.running = False
                 continue
                         
             with self.lock:
                 self.frame = frame.copy()
-                self.main_frame = main_frame.copy()
+                # self.main_frame = main_frame.copy()
                 
             self.out.write(frame)
-            self.main_out.write(main_frame)
+            # self.main_out.write(main_frame)
 
             if self.vialPresent:
                 cropped = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
@@ -131,11 +133,14 @@ class ColourDetector():
                 detected = None
                 
                 colours = [
-                    ("Yellow", np.array([10, 100, 100], dtype=np.uint8), np.array([24, 255, 255], dtype=np.uint8), (255, 255, 0)),
-                    ("Red", (np.array([0, 120, 70], dtype=np.uint8), np.array([170, 120, 70], dtype=np.uint8)), (np.array([10, 255, 255], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8)), (255, 0, 0)), 
+                    ("Yellow", np.array([20, 100, 100], dtype=np.uint8), np.array([35, 255, 255], dtype=np.uint8), (0, 255, 255)),
+                    ("Red", (np.array([0, 40, 40], dtype=np.uint8), np.array([160, 40, 40], dtype=np.uint8)), (np.array([15, 255, 255], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8)), (0, 0, 255)), 
                     ("Green", np.array([25, 52, 72], dtype=np.uint8), np.array([102, 255, 255], dtype=np.uint8), (0, 255, 0)),
                 ]
                 
+                colourName = "None"
+                colourRGB = (0, 0, 0)
+                max_count = 0
                 self.masks = { }
                 kernel = np.ones((5, 5), "uint8")
                             
@@ -151,17 +156,21 @@ class ColourDetector():
                         
                     # combined = cv2.bitwise_and(colour_mask, self.mask)
                     count = np.count_nonzero(colour_mask)
+                    if count > max_count:
+                        max_count = count
+                        colourName = name
+                        colourRGB = colour
                     
                     with self.lock:
-                        self.history["Seconds"].append(time.time() - self.start_time)
+                        self.history["Seconds"].append((time.time() - self.start_time))
                         self.history[name].append(count)
                     
-                    if count > 10000 and detected is None:
-                        detected = name
-                        self.colourName = detected
-                        self.colourRGB = colour
-                        with self.lock:
-                            self.frame = frame.copy()
+                if count > 3000 and detected is None:
+                    detected = colourName
+                    self.colourName = colourName
+                    self.colourRGB = colour
+                    with self.lock:
+                        self.frame = frame.copy()
             else:
                 time.sleep(0.1)
                 
@@ -225,9 +234,9 @@ class ColourDetector():
                     display = self.frame.copy()
                     cv2.putText(display, f"Colour:{self.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, self.colourRGB, 3)            
                     
-                    main_display = self.main_frame.copy()
+                    # main_display = self.main_frame.copy()
                     
-                    cv2.imshow("Colour detection 1", main_display)
+                    # cv2.imshow("Colour detection 1", main_display)
                     
                     self.drawContour(self.colourName, display)
                     cv2.rectangle(display, self.top_left, self.bottom_right,  (255, 0, 255), 3)

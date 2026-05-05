@@ -97,7 +97,7 @@ class TrafficLight():
 
             # move above that position
             above_position = self.starting_rack.get_above_tcp(row, col, 0.1)
-            self.controller.move_tcp(above_position, 0.5, 0.2)
+            self.controller.move_tcp(above_position, 1.0, 1.0)
             
             # move down to that position
             picking_position = self.starting_rack.get_picking_tcp(row, col)
@@ -107,7 +107,7 @@ class TrafficLight():
             self.controller.fully_close_gripper()
             time.sleep(1)
             
-            self.controller.move_tcp(above_position, 0.5, 0.2)
+            self.controller.move_tcp(above_position, 1.0, 1.0)
             self.starting_rack.set_vial_state(row, col, VialState.EMPTY)
 
             if not self.controller.vial_gripped():
@@ -118,13 +118,13 @@ class TrafficLight():
                 # Move to above stirrer
                 self.detector.change_state("Vial found. Moving to stirrer")
                 above_stirrer = self.stirrer.get_above_stirring_position(0.05)
-                self.controller.move_tcp(above_stirrer, 0.5, 0.2)
+                self.controller.move_tcp(above_stirrer, 1.0, 1.0)
                 
                 # Move down to just above stirrer
-                self.controller.move_tcp(self.stirrer.get_stirring_position(), 0.5, 0.2)
+                self.controller.move_tcp(self.stirrer.get_stirring_position(), 1.0, 1.0)
                 
                 self.detector.vialPresent = True
-                time.sleep(2)
+                time.sleep(1)
                 
                 self.detector.change_state("Starting stirring")
                 self.stirrer.on()
@@ -159,14 +159,14 @@ class TrafficLight():
                     self.detector.change_state("Placing vial in finishing rack")
                     # move to above final spot
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.1)
-                    self.controller.move_tcp(above_position, 0.5, 0.2)
+                    self.controller.move_tcp(above_position, 0.5, 0.5)
                     
                     # intermediate movements
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.07)
-                    self.controller.move_tcp(above_position, 0.5, 0.2)
+                    self.controller.move_tcp(above_position, 0.5, 0.5)
 
                     intermediate_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.04)
-                    self.controller.move_tcp(intermediate_position, 0.5, 0.2)
+                    self.controller.move_tcp(intermediate_position, 0.5, 0.5)
 
                     intermediate_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.01)
                     self.controller.move_tcp(intermediate_position, 0.1, 0.1)
@@ -187,7 +187,7 @@ class TrafficLight():
                     self.vial_results.append(vial)
                     
                     # move back up
-                    self.controller.move_tcp(above_position, 0.5, 0.2)
+                    self.controller.move_tcp(above_position, 1.0, 1.0)
 
         self.detector.running = False
         time.sleep(0.2)
