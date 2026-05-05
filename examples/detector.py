@@ -134,7 +134,7 @@ class ColourDetector():
                 
                 colours = [
                     ("Yellow", np.array([20, 100, 100], dtype=np.uint8), np.array([35, 255, 255], dtype=np.uint8), (0, 255, 255)),
-                    ("Red", (np.array([0, 40, 40], dtype=np.uint8), np.array([160, 40, 40], dtype=np.uint8)), (np.array([15, 255, 255], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8)), (0, 0, 255)), 
+                    ("Red", (np.array([0, 40, 40], dtype=np.uint8), np.array([140, 40, 40], dtype=np.uint8)), (np.array([15, 255, 255], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8)), (0, 0, 255)), 
                     ("Green", np.array([25, 52, 72], dtype=np.uint8), np.array([102, 255, 255], dtype=np.uint8), (0, 255, 0)),
                 ]
                 

@@ -88,9 +88,7 @@ class TrafficLight():
                 break
 
             row, col = search_position
-            
-            vial = Vial(self.volumes.get((row, col)), (row, col))
-            
+                        
             self.detector.change_state("Searching for vial in next position")
             self.starting_rack.print_state()
             self.finishing_rack.print_state()
@@ -115,6 +113,8 @@ class TrafficLight():
                 self.controller.set_gripper(91)
                 time.sleep(1)            
             else:                         
+                vial = Vial(self.volumes.get((row, col)))
+
                 # Move to above stirrer
                 self.detector.change_state("Vial found. Moving to stirrer")
                 above_stirrer = self.stirrer.get_above_stirring_position(0.05)
