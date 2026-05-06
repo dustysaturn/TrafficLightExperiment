@@ -30,7 +30,7 @@ class TrafficLight():
         
         self.controller = Controller(self.robot, self.gripper)
         
-        self.detector = ColourDetector(VIAL_CAMERA_PORT, MAIN_CAMERA_PORT, SubtractionMethod.KNN)
+        self.detector = ColourDetector(VIAL_CAMERA_PORT, SubtractionMethod.KNN)
         
         self.detector.change_state("Idle")
 
@@ -113,7 +113,7 @@ class TrafficLight():
                 self.controller.set_gripper(91)
                 time.sleep(1)            
             else:                         
-                vial = Vial(self.volumes.get((row, col)))
+                vial = Vial(self.volumes.get((row, col)), (row, col))
 
                 # Move to above stirrer
                 self.detector.change_state("Vial found. Moving to stirrer")

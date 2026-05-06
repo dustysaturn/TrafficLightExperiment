@@ -1,9 +1,8 @@
 import argparse
 from traffic_light import TrafficLight
-import time
 
 MIN_NAOH = 0
-MAX_NAOH = 50
+MAX_NAOH = 10
 
 STARTING_TOP_LEFT = [0.247303237, -0.50343651, 0.061092968, -0.000494386386, 3.10905968, 0.0322229148]
 STARTING_BOTTOM_RIGHT = [2.06852955e-01, -5.83576160e-01,  6.73237370e-02, -5.29288419e-04, 3.10908896e+00,  3.22737449e-02]
@@ -16,13 +15,24 @@ def input_volumes(vials, cols):
     
     for i in range(vials):
         row, col = divmod(i, cols)
-        volume = input(f"\n - NaOH (ml) in starting rack position [{row}, {col}]: ")
         
-        while not volume.isnumeric() or float(volume) < MIN_NAOH or float(volume) > MAX_NAOH:
-            print(f"\nError: Please input an integer between {MIN_NAOH} and {MAX_NAOH}")
-            volume = input(f"\n - NaOH (ml) in starting rack position [{row}, {col}]: ")
+        while(True):
+            raw_volume = input(f"\n - NaOH (ml) in starting rack position [{row}, {col}]: ")
         
-        volumes[(row, col)] = int(volume)
+            if raw_volume.strip().upper() != "N": 
+                break
+            
+            try:
+                volume = float(raw_volume)
+                
+                if MIN_NAOH <= volume <= MAX_NAOH:
+                    volumes[(row, col)] = volume
+                    break
+                else:
+                    print(f"\nError: Please input an integer between {MIN_NAOH} and {MAX_NAOH}")
+            
+            except ValueError:
+                print(f"\nError: {raw_volume} is not a valid number.")        
 
     return volumes
 

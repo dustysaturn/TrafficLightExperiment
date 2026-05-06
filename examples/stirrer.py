@@ -2,7 +2,7 @@ from serial import Serial
 import time
 
 MIN_SPEED = 0
-MAX_SPEED = 310
+MAX_SPEED = 1500
 
 class Stirrer:
     def __init__(self, stirring_position):
@@ -47,7 +47,7 @@ class Stirrer:
         print("Stirrer stopped")
 
     def set_speed(self, rpm: int):
-        if rpm < MIN_SPEED and rpm > MAX_SPEED:
+        if rpm < MIN_SPEED or rpm > MAX_SPEED:
             raise ValueError(f"{rpm} is outside of the range. Speed must be within 0 and 310 inclusive.")
         
         self._send(f"OUT_SP_4 {rpm}\r\n")

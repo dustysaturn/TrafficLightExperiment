@@ -27,7 +27,7 @@ def graph_results(vials: list[Vial], folder, timeout):
             next_time = time_to_green[i+1] if time_to_green[i+1] is not None else timeout
             y = [time, next_time]
             
-            if time < timeout > next_time:
+            if time < timeout and next_time < timeout:
                 plt.plot(x, y, color='green', linestyle='-', alpha=0.8)
             else:
                 plt.plot(x, y, color='red', linestyle='--', alpha=0.4)

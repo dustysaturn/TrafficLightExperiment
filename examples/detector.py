@@ -13,7 +13,7 @@ import os
 # bus 003 device 005 id 046d: 08e5 logitech inc hd pro webcam c920
 
 class ColourDetector():
-    def __init__(self, vial_cam, main_cam, subtraction_method):
+    def __init__(self, vial_cam, subtraction_method):
         self.lock = threading.Lock()
         self.cam = cv2.VideoCapture(vial_cam)
                             
@@ -26,18 +26,11 @@ class ColourDetector():
         self.top_left = (int(self.width * (2/5)), int(self.height * (1/3)))
         self.bottom_right = (int(self.width * (3/5)), int(self.height * (2/3)))
         
-        self.fourcc = cv2.VideoWriter.fourcc(*'mp4v')
+        # try avc1
+        self.fourcc = cv2.VideoWriter.fourcc(*'avc1')
         
         self.cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
-            
-        # INTEGRATE
-        # self.main_cam = cv2.VideoCapture(main_cam)
-        # self.main_cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        # self.main_cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        # self.main_width = int(self.main_cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        # self.main_height = int(self.main_cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # self.main_cam.set(cv2.CAP_PROP_FOURCC, self.fourcc)
-        
+                    
         self.masked_out = None
         self.graph_out = None
         
@@ -59,20 +52,12 @@ class ColourDetector():
         else:
             print("SUCCESS: VIAL_VideoWriter is ready to record.")
                             
-        # INTEGRATE
-        # self.main_out = cv2.VideoWriter(f'{self.folder}/main.mp4', self.fourcc, 20.0, (self.main_width, self.main_height))
-
-        # if not self.main_out.isOpened():
-        #     print("ERROR: MAIN_VideoWriter failed to open. Check your codec, file path, and resolution.")
-        # else:
-        #     print("SUCCESS: MAIN_VideoWriter is ready to record.")
-
         self.method = subtraction_method
         self.mask = None
         self.masks = {}
         self.frame = None
         self.colourName = "None"
-        self.colourRGB = (255, 255, 255)
+        self.colourRGB = (0, 0, 0)
         self.vialPresent = False
         self.history = {"Yellow": [], "Red": [], "Green": [], "Seconds": []}
         self.start_time = time.time()
@@ -94,7 +79,8 @@ class ColourDetector():
     
     def end(self):
         self.running = False
-        if self.thread.is_alive():
+        time.sleep(0.5)
+        if hasattr(self, 'thread') and self.thread.is_alive():
             self.thread.join()
             
         if self.visualise_thread.is_alive():
@@ -102,7 +88,6 @@ class ColourDetector():
 
         cv2.destroyAllWindows()
             
-        # for writer in [self.out, self.main_out, self.masked_out, self.graph_out]:
         for writer in [self.out, self.masked_out, self.graph_out]:
             if writer is not None:
                 writer.release()
@@ -110,19 +95,14 @@ class ColourDetector():
     def loop(self):
         while(self.running):
             ret, frame = self.cam.read()
-            # main_ret, main_frame = self.main_cam.read()
                                     
-            # if not (ret and main_ret):
             if not (ret):
                 self.running = False
                 continue
                         
             with self.lock:
                 self.frame = frame.copy()
-                # self.main_frame = main_frame.copy()
-                
             self.out.write(frame)
-            # self.main_out.write(main_frame)
 
             if self.vialPresent:
                 cropped = frame[self.top_left[1]:self.bottom_right[1], self.top_left[0]:self.bottom_right[0]]
@@ -141,7 +121,7 @@ class ColourDetector():
                 colourName = "None"
                 colourRGB = (0, 0, 0)
                 max_count = 0
-                self.masks = { }
+                self.masks = {}
                 kernel = np.ones((5, 5), "uint8")
                             
                 for (name, lower, upper, colour) in colours:
@@ -154,21 +134,20 @@ class ColourDetector():
                 
                     self.masks[name] = cv2.dilate(colour_mask, kernel)
                         
-                    # combined = cv2.bitwise_and(colour_mask, self.mask)
-                    count = np.count_nonzero(colour_mask)
+                    count = int(np.count_nonzero(colour_mask))
                     if count > max_count:
                         max_count = count
                         colourName = name
                         colourRGB = colour
-                    
+                                        
                     with self.lock:
                         self.history["Seconds"].append((time.time() - self.start_time))
                         self.history[name].append(count)
                     
-                if count > 3000 and detected is None:
+                if max_count > 3000 and detected is None:
                     detected = colourName
                     self.colourName = colourName
-                    self.colourRGB = colour
+                    self.colourRGB = colourRGB
                     with self.lock:
                         self.frame = frame.copy()
             else:
@@ -232,12 +211,8 @@ class ColourDetector():
             while self.running:
                 if self.frame is not None:
                     display = self.frame.copy()
-                    cv2.putText(display, f"Colour:{self.colourName}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, self.colourRGB, 3)            
-                    
-                    # main_display = self.main_frame.copy()
-                    
-                    # cv2.imshow("Colour detection 1", main_display)
-                    
+                    cv2.putText(display, f"Colour:{self.colourName}", (20, 60), cv2.FONT_HERSHEY_PLAIN, 4, self.colourRGB, 3)            
+                                        
                     self.drawContour(self.colourName, display)
                     cv2.rectangle(display, self.top_left, self.bottom_right,  (255, 0, 255), 3)
                             
@@ -246,7 +221,7 @@ class ColourDetector():
                         self.masked_out = cv2.VideoWriter(f'{self.folder}/masked.mp4', self.fourcc, 10.0, (width, height))
 
                     self.masked_out.write(display)
-                    cv2.imshow("Colour detection 2", display)
+                    cv2.imshow("Colour detection", display)
                                 
                     seconds = list(self.history["Seconds"])
                     yellow = list(self.history["Yellow"])
@@ -276,10 +251,13 @@ class ColourDetector():
                                         
                 k = cv2.waitKey(1)
                 if k == 27:
-                    break
-            
-                time.sleep(0.1)
+                    self.running = False
+                    break            
         finally:
-            # INTEGRATE
             with open(f"{self.folder}/colour-history", 'w') as file:
                 json.dump(self.history, file, indent=4)
+
+detect = ColourDetector("./raw.mp4", SubtractionMethod.KNN)
+detect.start()
+detect.visualise()
+detect.end()
