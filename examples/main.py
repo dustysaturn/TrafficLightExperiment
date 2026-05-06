@@ -12,14 +12,17 @@ STIRRER = [0.01291479, -0.49279505,  0.14928015, -0.68575716, -3.05472425,  0.06
 
 def input_volumes(vials, cols):
     volumes = {}
-    
-    for i in range(vials):
-        row, col = divmod(i, cols)
+    recorded_vials = 0
+    curr = 0
+
+    while recorded_vials < vials:
+        row, col = divmod(curr, cols)
         
         while(True):
             raw_volume = input(f"\n - NaOH (ml) in starting rack position [{row}, {col}]: ")
         
-            if raw_volume.strip().upper() != "N": 
+            if raw_volume.strip().upper() == "N": 
+                curr += 1
                 break
             
             try:
@@ -27,9 +30,11 @@ def input_volumes(vials, cols):
                 
                 if MIN_NAOH <= volume <= MAX_NAOH:
                     volumes[(row, col)] = volume
+                    recorded_vials += 1
+                    curr += 1
                     break
                 else:
-                    print(f"\nError: Please input an integer between {MIN_NAOH} and {MAX_NAOH}")
+                    print(f"\nError: Please input a number between {MIN_NAOH} and {MAX_NAOH}")
             
             except ValueError:
                 print(f"\nError: {raw_volume} is not a valid number.")        
