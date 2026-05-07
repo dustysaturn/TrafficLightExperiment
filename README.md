@@ -1,22 +1,25 @@
-# UR Robot Control
+# Traffic Light Experiment
 
-Python utilities and examples for controlling Universal Robots (UR) robotic arms with Robotiq grippers, developed for the CHEM504 course.
+Automation for the Traffic Light Experiment using a UR5, Robotiq Gripper, IKA RCT Electric Stirrer, and Logitech HD 1080p Webcam, developed for the CHEM504 module at the University of Liverpool. 
 
 ## Overview
 
 This repository provides a collection of Python scripts and utilities to interface with:
 - **Universal Robots (UR)** robotic arms via socket communication and RTDE (Real-Time Data Exchange)
 - **Robotiq grippers** (tested with HAND-E model)
-- **Wrist-mounted cameras** on UR robots
+- **IKA RCT Electric Stirrer** via USB
+- **Logitech HD 1080p Webcam** via USB
 
 ## Repository Structure
 
 ```
-chem504-2425/
-├── examples/              # Example scripts demonstrating robot control
-│   ├── robotiq/          # Robotiq gripper control modules
-│   └── utils/            # UR robot utilities and helper functions
-└── README.md
+TrafficLightExperiment/
+├── src/                   # Example scripts demonstrating robot control
+│   ├── pose_measurements/ # Calculation of rack vial
+│   ├── robotiq/           # Robotiq gripper control modules
+│   ├── utils/             # UR robot utilities and helper functions
+│   └── experiment/        # Execution of automated experiment
+└── README.md 
 ```
 
 ## Prerequisites
@@ -24,7 +27,8 @@ chem504-2425/
 ### Hardware
 - Universal Robots robotic arm (configured at IP: `192.168.0.2`)
 - Robotiq gripper (HAND-E or compatible model)
-- Optional: Robotiq wrist camera
+- IKA RCT Electric Stirrer with USB interface
+- Logitech HD 1080p Webcam with USB interface
 
 ### Software Dependencies
 ```bash
@@ -33,6 +37,7 @@ pip install opencv-python
 pip install Pillow
 pip install requests
 pip install ur-rtde
+pip install matplotlib
 ```
 
 ## Core Modules
@@ -55,115 +60,41 @@ Complete gripper control interface:
 ### 3. RTDE Interface (`utils/rtde.py`)
 Real-Time Data Exchange protocol implementation for UR robots.
 
-## Example Scripts
+### 4. Pose Measurements
+Data file containing robot pose samples within rack positions in the starting and finishing rack
 
-### Basic Robot Control
+### 5. Experiment Automation (`experiment/main.py`)
+Classes for experiment state tracking and manipulation:
+- TrafficLightExperiment
+- Controller
+- Detector
+- Rack
+- Stirrer
+- Vial
+- Gripper
 
-#### `test_robot_home.py`
-Move robot to predefined joint configurations:
-```python
-python examples/test_robot_home.py
-```
-Demonstrates:
-- Converting degrees to radians for joint positions
-- Moving to specific joint states (with default velocity=0.5, acceleration=0.5)
+CV analysis of colour change using Background Subtraction and majority pixel counts of colour masks for yellow, red, and green.
 
-#### `test_get_joints.py`
-Read current robot state:
-```python
-python examples/test_get_joints.py
-```
-Retrieves:
-- Current joint positions (radians)
-- Current TCP position (x, y, z, rx, ry, rz)
+Data analysis of time for the experiment to complete for each vial. 
 
-### Gripper Control
+`main.py` is a CLI entry point for running the experiment.
 
-#### `test_gripper.py`
-Control the Robotiq gripper:
-```python
-python examples/test_gripper.py
-```
-Demonstrates:
-- Connecting to gripper at port 63352
-- Moving gripper with position control
-
-#### `test_position.py`
-Combined robot and gripper control:
-```python
-python examples/test_position.py
-```
-Shows coordinated movement of robot arm and gripper operation.
-
-### Camera Integration
-
-#### `test_get_image.py`
-Capture images from a standard USB camera:
-```python
-python examples/test_get_image.py
-```
-Features:
-- Live camera preview using OpenCV
-- Press SPACE to capture images
-- Press ESC to exit
-
-#### `test_robotiq_wrist_camera.py`
-Capture images from the Robotiq wrist camera:
-```python
-python examples/test_robotiq_wrist_camera.py
-```
-Retrieves images via HTTP from the robot's integrated camera.
-
-## Quick Start
+## Quick Start (WITHIN THE CTH LABS)
 
 ### 1. Connect to the Robot
-
 Ensure your computer is on the same network as the robot (default IP: `192.168.0.2`).
 
-### 2. Basic Usage Example
+### 2. Connect to the Stirrer
+Ensure the stirrer is in port `/dev/ttyACM0`.
 
-```python
-from utils.UR_Functions import URfunctions as URControl
-from robotiq.robotiq_gripper import RobotiqGripper
+### 3. Connect to the Camera
+Ensure the camera is in port 0.
 
-# Initialize robot connection
-robot = URControl(ip="192.168.0.2", port=30003)
+### 4. Setup the chemicals
+Prepare your solutions for the Traffic Light Experiment, waiting until they become yellow before starting Step 5. 
 
-# Initialize gripper
-gripper = RobotiqGripper()
-gripper.connect("192.168.0.2", 63352)
-
-# Move robot to home position
-robot.go_home()
-
-# Get current position
-joint_positions = robot.get_current_joint_positions()
-tcp_position = robot.get_current_tcp()
-
-# Move gripper
-gripper.move(position=128, speed=255, force=100)
-```
-
-### 3. Joint Movement
-
-```python
-import math
-
-def degrees_to_rad(degrees_list):
-    return [d * (math.pi / 180) for d in degrees_list]
-
-# Define joint angles in degrees
-joint_angles_deg = [93.77, -89.07, 89.97, -90.01, -90.04, 0.0]
-joint_angles_rad = degrees_to_rad(joint_angles_deg)
-
-# Move robot
-robot.move_joint_list(
-    q=joint_angles_rad,  # joint positions
-    v=0.5,               # velocity
-    a=0.2,               # acceleration
-    r=0.05               # blend radius
-)
-```
+### 5. Run main.py
+Input the number of vials in the experiment, and the concentration of NaOH in each.
 
 ## Configuration
 
@@ -172,12 +103,8 @@ robot.move_joint_list(
 - **Robot Port**: `30003` (socket communication)
 - **Gripper Port**: `63352`
 - **Camera URL**: `http://192.168.0.2:4242/current.jpg?type=color`
-
-<!-- ### Home Joint Configuration
-Default home position (radians):
-```python
-[1.636, -1.555, 1.570, -1.571, -1.572, -0.00002]
-``` -->
+- **Camera Port**: `0`
+- **Stirrer Port**: `/dev/ttyACM0`
 
 ## Safety Notes
 
@@ -190,8 +117,7 @@ Default home position (radians):
 
 ## License
 
-Portions of this code are based on Universal Robots' RTDE interface (see `utils/rtde.py` for copyright notice).
-
+This codebase is built upon the chem504-2425 repository (see `https://github.com/LARC-Lab/chem504-2425`), portions of which are based on Universal Robots' RTDE interface (see `utils/rtde.py` for copyright notice).
 
 ## Additional Resources
 
