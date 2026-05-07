@@ -1,4 +1,4 @@
-from enums import VialColour
+from experiment.enums import VialColour
 
 class Vial():
     def __init__(self, volume, coords) -> None:

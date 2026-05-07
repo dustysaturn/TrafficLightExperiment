@@ -1,5 +1,5 @@
-from vial import Vial
-from enums import VialState
+from experiment.vial import Vial
+from experiment.enums import VialState
 
 class Rack():
     def __init__(self, rows: int, cols: int, row_gap: float, col_gap: float, top_left_picking_tcp: list[float], bottom_right_picking_tcp: list[float], empty: bool) -> None:

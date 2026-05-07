@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from vial import Vial
+from experiment.vial import Vial
 import os
 
 def graph_results(vials: list[Vial], folder, timeout):

@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime
 import cv2
-from enums import SubtractionMethod
+from experiment.enums import SubtractionMethod
 import numpy as np
 import json
 import time
@@ -9,8 +9,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
-
-# bus 003 device 005 id 046d: 08e5 logitech inc hd pro webcam c920
 
 class ColourDetector():
     def __init__(self, vial_cam, subtraction_method):
@@ -204,8 +202,6 @@ class ColourDetector():
             image = np.array(figure.canvas.renderer.buffer_rgba(), dtype=np.uint8)
 
             return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)         
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         try:    
             while self.running:

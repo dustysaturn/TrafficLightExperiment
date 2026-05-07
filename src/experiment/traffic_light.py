@@ -1,12 +1,12 @@
 from robotiq.robotiq_gripper import RobotiqGripper
 from utils.UR_Functions import URfunctions as URControl
-from controller import Controller
-from rack import Rack
-from stirrer import Stirrer
-from detector import ColourDetector
-from enums import VialState, SubtractionMethod
-from vial import Vial
-from data_analysis import graph_results
+from experiment.controller import Controller
+from experiment.rack import Rack
+from experiment.stirrer import Stirrer
+from experiment.detector import ColourDetector
+from experiment.enums import VialState, SubtractionMethod
+from experiment.vial import Vial
+from experiment.data_analysis import graph_results
 import time
 import numpy as np
 import cv2
@@ -93,15 +93,15 @@ class TrafficLight():
             self.starting_rack.print_state()
             self.finishing_rack.print_state()
 
-            # move above that position
+            # Move above that position
             above_position = self.starting_rack.get_above_tcp(row, col, 0.1)
             self.controller.move_tcp(above_position, 1.0, 1.0)
             
-            # move down to that position
+            # Move down to that position
             picking_position = self.starting_rack.get_picking_tcp(row, col)
             self.controller.move_tcp(picking_position, 0.2, 0.2)
             
-            # close gripper
+            # Close gripper
             self.controller.fully_close_gripper()
             time.sleep(1)
             
@@ -157,11 +157,11 @@ class TrafficLight():
                     return
                 else:
                     self.detector.change_state("Placing vial in finishing rack")
-                    # move to above final spot
+                    # Move to above final spot
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.1)
                     self.controller.move_tcp(above_position, 0.5, 0.5)
                     
-                    # intermediate movements
+                    # Intermediate movements
                     above_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.07)
                     self.controller.move_tcp(above_position, 0.5, 0.5)
 
@@ -174,19 +174,16 @@ class TrafficLight():
                     intermediate_position = self.finishing_rack.get_above_tcp(*empty_spot, 0.005)
                     self.controller.move_tcp(intermediate_position, 0.1, 0.1)
                     
-                    # # move down to final spot
-                    # release_position = self.finishing_rack.get_picking_tcp(*empty_spot)
-                    # self.controller.move_tcp(release_position, 0.1, 0.1)
-
-                    # release gripper
+                    # Release gripper
                     self.controller.set_gripper(91)
                     self.finishing_rack.set_vial_state(*empty_spot, VialState.PRESENT)
                     
+                    # Update vial
                     vial.switch_rack()
                     vial.set_coords(empty_spot)
                     self.vial_results.append(vial)
                     
-                    # move back up
+                    # Move back up
                     self.controller.move_tcp(above_position, 1.0, 1.0)
 
         self.detector.running = False

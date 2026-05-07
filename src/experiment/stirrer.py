@@ -63,7 +63,6 @@ class Stirrer:
         response = self.ser.readline().decode('ascii').strip()
         int_response = int(response)
         
-        print(int_response)
-        print(f"Stirrer speed is {response}")
+        print(f"Stirrer speed is {int_response}")
         
         return(int_response)

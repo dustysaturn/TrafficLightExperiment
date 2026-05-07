@@ -1,5 +1,5 @@
 import argparse
-from traffic_light import TrafficLight
+from experiment.traffic_light import TrafficLight
 
 MIN_NAOH = 0
 MAX_NAOH = 10
